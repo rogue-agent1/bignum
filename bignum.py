@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Arbitrary precision integer calculator with common functions."""
+"""Big number arithmetic — factorial, fibonacci, catalan, combinations."""
 import sys
 
 def factorial(n):
@@ -7,47 +7,46 @@ def factorial(n):
     for i in range(2, n+1): r *= i
     return r
 
-def fibonacci(n):
+def fib(n):
+    if n <= 1: return n
     a, b = 0, 1
-    for _ in range(n): a, b = b, a + b
-    return a
+    for _ in range(2, n+1): a, b = b, a+b
+    return b
 
-def gcd(a, b):
-    while b: a, b = b, a % b
-    return a
+def fib_matrix(n):
+    def mat_mul(A, B):
+        return [[A[0][0]*B[0][0]+A[0][1]*B[1][0], A[0][0]*B[0][1]+A[0][1]*B[1][1]],
+                [A[1][0]*B[0][0]+A[1][1]*B[1][0], A[1][0]*B[0][1]+A[1][1]*B[1][1]]]
+    if n <= 1: return max(0, n)
+    result, base = [[1,0],[0,1]], [[1,1],[1,0]]
+    n -= 1
+    while n:
+        if n & 1: result = mat_mul(result, base)
+        base = mat_mul(base, base); n >>= 1
+    return result[0][0]
 
-def lcm(a, b): return abs(a * b) // gcd(a, b)
+def comb(n, r):
+    if r > n: return 0
+    if r > n-r: r = n-r
+    result = 1
+    for i in range(r): result = result * (n-i) // (i+1)
+    return result
 
-def is_perfect(n):
-    return sum(i for i in range(1, n) if n % i == 0) == n
+def catalan(n): return comb(2*n, n) // (n+1)
+def stirling2(n, k):
+    if n == 0 and k == 0: return 1
+    if n == 0 or k == 0: return 0
+    return k * stirling2(n-1, k) + stirling2(n-1, k-1)
 
-def collatz_len(n):
-    steps = 0
-    while n != 1: n = n // 2 if n % 2 == 0 else 3 * n + 1; steps += 1
-    return steps
+def cli():
+    if len(sys.argv) < 3:
+        print("Usage: bignum <cmd> <n> [k]"); print("  fact|fib|fibmat|comb|catalan|stirling"); sys.exit(1)
+    cmd, n = sys.argv[1], int(sys.argv[2])
+    if cmd == "fact": r = factorial(n); s = str(r); print(f"{n}! = {s[:80]}{'...' if len(s)>80 else ''} ({len(s)} digits)")
+    elif cmd == "fib": r = fib(n); s = str(r); print(f"F({n}) = {s[:80]}{'...' if len(s)>80 else ''} ({len(s)} digits)")
+    elif cmd == "fibmat": r = fib_matrix(n); s = str(r); print(f"F({n}) = {s[:80]}{'...' if len(s)>80 else ''} ({len(s)} digits)")
+    elif cmd == "comb": k = int(sys.argv[3]); print(f"C({n},{k}) = {comb(n,k)}")
+    elif cmd == "catalan": print(f"Catalan({n}) = {catalan(n)}")
+    elif cmd == "stirling": k = int(sys.argv[3]); print(f"S({n},{k}) = {stirling2(n,k)}")
 
-OPS = {
-    'fact': lambda args: str(factorial(int(args[0]))),
-    'fib': lambda args: str(fibonacci(int(args[0]))),
-    'gcd': lambda args: str(gcd(int(args[0]), int(args[1]))),
-    'lcm': lambda args: str(lcm(int(args[0]), int(args[1]))),
-    'pow': lambda args: str(int(args[0]) ** int(args[1])),
-    'sqrt': lambda args: str(int(int(args[0]) ** 0.5)),
-    'perfect': lambda args: str(is_perfect(int(args[0]))),
-    'digits': lambda args: str(len(str(abs(int(args[0]))))),
-    'sum_digits': lambda args: str(sum(int(d) for d in str(abs(int(args[0]))))),
-    'collatz': lambda args: str(collatz_len(int(args[0]))),
-}
-
-if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print(f"Usage: bignum.py <{'|'.join(OPS.keys())}> <args...>"); sys.exit(1)
-    op = sys.argv[1]
-    if op in OPS:
-        result = OPS[op](sys.argv[2:])
-        print(result[:1000] + ('...' if len(result) > 1000 else ''))
-        if len(result) > 20: print(f"({len(result)} digits)")
-    elif op == 'eval':
-        print(eval(' '.join(sys.argv[2:])))
-    else:
-        print(f"Unknown: {op}")
+if __name__ == "__main__": cli()
