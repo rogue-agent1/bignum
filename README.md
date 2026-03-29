@@ -1,19 +1,11 @@
 # bignum
 
-Big number arithmetic — factorial, fibonacci, combinatorics
+bignum - Arbitrary precision arithmetic without Python's built-in bigint.
+
+Zero-dependency, single-file Python CLI.
 
 ## Usage
 
 ```bash
-python3 bignum.py --help
+python3 bignum.py
 ```
-
-## Features
-
-- Single file, zero dependencies
-- Python 3.8+ compatible
-- CLI interface
-
-## License
-
-MIT
