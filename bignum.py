@@ -1,114 +1,150 @@
 #!/usr/bin/env python3
-"""bignum - Arbitrary precision arithmetic without Python's built-in bigint."""
-import sys, json
+"""bignum - Arbitrary precision arithmetic, number theory, and cryptographic primes."""
 
-class BigNum:
-    BASE = 10000
-    def __init__(self, digits=None, negative=False):
-        self.digits = digits or [0]
-        self.negative = negative
-        self._strip()
-    
-    def _strip(self):
-        while len(self.digits) > 1 and self.digits[-1] == 0: self.digits.pop()
-        if self.digits == [0]: self.negative = False
-    
-    @staticmethod
-    def from_int(n):
-        if n < 0: return BigNum.from_int(-n)._neg()
-        if n == 0: return BigNum([0])
-        digits = []
-        while n > 0: digits.append(n % BigNum.BASE); n //= BigNum.BASE
-        return BigNum(digits)
-    
-    @staticmethod
-    def from_str(s):
-        neg = s.startswith("-")
-        if neg: s = s[1:]
-        s = s.lstrip("0") or "0"
-        digits = []
-        for i in range(len(s), 0, -4):
-            start = max(0, i-4)
-            digits.append(int(s[start:i]))
-        return BigNum(digits, neg)
-    
-    def _neg(self):
-        return BigNum(list(self.digits), not self.negative)
-    
-    def __repr__(self):
-        if not self.digits: return "0"
-        s = str(self.digits[-1])
-        for d in reversed(self.digits[:-1]): s += str(d).zfill(4)
-        return ("-" + s) if self.negative else s
-    
-    def _cmp_abs(self, other):
-        if len(self.digits) != len(other.digits):
-            return 1 if len(self.digits) > len(other.digits) else -1
-        for i in range(len(self.digits)-1, -1, -1):
-            if self.digits[i] != other.digits[i]:
-                return 1 if self.digits[i] > other.digits[i] else -1
-        return 0
-    
-    def _add_abs(self, other):
-        n = max(len(self.digits), len(other.digits))
-        result = []; carry = 0
-        for i in range(n):
-            s = carry
-            if i < len(self.digits): s += self.digits[i]
-            if i < len(other.digits): s += other.digits[i]
-            result.append(s % self.BASE); carry = s // self.BASE
-        if carry: result.append(carry)
-        return BigNum(result)
-    
-    def _sub_abs(self, other):
-        if self._cmp_abs(other) < 0:
-            return other._sub_abs(self)._neg()
-        result = []; borrow = 0
-        for i in range(len(self.digits)):
-            s = self.digits[i] - borrow
-            if i < len(other.digits): s -= other.digits[i]
-            if s < 0: s += self.BASE; borrow = 1
-            else: borrow = 0
-            result.append(s)
-        return BigNum(result)
-    
-    def __add__(self, other):
-        if self.negative == other.negative:
-            r = self._add_abs(other); r.negative = self.negative; return r
-        if self._cmp_abs(other) >= 0:
-            r = self._sub_abs(other); r.negative = self.negative; r._strip(); return r
-        r = other._sub_abs(self); r.negative = other.negative; r._strip(); return r
-    
-    def __mul__(self, other):
-        n, m = len(self.digits), len(other.digits)
-        result = [0]*(n+m)
-        for i in range(n):
-            carry = 0
-            for j in range(m):
-                prod = self.digits[i]*other.digits[j]+result[i+j]+carry
-                result[i+j] = prod % self.BASE; carry = prod // self.BASE
-            result[i+m] += carry
-        r = BigNum(result, self.negative != other.negative); r._strip(); return r
+import sys, random, math
 
-def factorial(n):
-    result = BigNum.from_int(1)
-    for i in range(2, n+1):
-        result = result * BigNum.from_int(i)
-    return result
+def cmd_calc(args):
+    """Evaluate arbitrary precision expression."""
+    expr = ' '.join(args)
+    # safe eval with only math operations
+    allowed = {'__builtins__': {}, 'abs': abs, 'pow': pow, 'min': min, 'max': max,
+               'gcd': math.gcd, 'factorial': math.factorial, 'isqrt': math.isqrt}
+    try:
+        result = eval(expr, allowed)
+        print(result)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr); sys.exit(1)
+
+def cmd_factor(args):
+    """Prime factorization."""
+    n = int(args[0])
+    if n < 2: print(f"{n} (not factorable)"); return
+    factors = []
+    d = 2
+    temp = n
+    while d * d <= temp:
+        while temp % d == 0:
+            factors.append(d)
+            temp //= d
+        d += 1
+    if temp > 1: factors.append(temp)
+    from collections import Counter
+    c = Counter(factors)
+    parts = []
+    for p, e in sorted(c.items()):
+        parts.append(f"{p}^{e}" if e > 1 else str(p))
+    print(f"{n} = {' × '.join(parts)}")
+    print(f"  {len(factors)} prime factors, {len(c)} distinct")
+
+def is_prime_miller(n, k=20):
+    if n < 2: return False
+    if n < 4: return True
+    if n % 2 == 0: return False
+    d, r = n - 1, 0
+    while d % 2 == 0: d //= 2; r += 1
+    for _ in range(k):
+        a = random.randrange(2, n - 1)
+        x = pow(a, d, n)
+        if x == 1 or x == n - 1: continue
+        for _ in range(r - 1):
+            x = pow(x, 2, n)
+            if x == n - 1: break
+        else: return False
+    return True
+
+def cmd_prime(args):
+    """Check if number is prime (Miller-Rabin)."""
+    n = int(args[0])
+    result = is_prime_miller(n)
+    print(f"{n} is {'PRIME' if result else 'COMPOSITE'}")
+    if not result and n > 1:
+        # find smallest factor
+        for d in range(2, min(n, 1000000)):
+            if n % d == 0:
+                print(f"  smallest factor: {d}")
+                break
+
+def cmd_genprime(args):
+    """Generate random prime of given bit length."""
+    bits = int(args[0]) if args else 256
+    while True:
+        n = random.getrandbits(bits) | (1 << (bits - 1)) | 1
+        if is_prime_miller(n):
+            print(f"Prime ({bits} bits, {len(str(n))} digits):")
+            print(n)
+            return
+
+def cmd_gcd(args):
+    nums = [int(a) for a in args]
+    result = nums[0]
+    for n in nums[1:]:
+        result = math.gcd(result, n)
+    print(f"GCD: {result}")
+    # also LCM
+    lcm = nums[0]
+    for n in nums[1:]:
+        lcm = lcm * n // math.gcd(lcm, n)
+    print(f"LCM: {lcm}")
+
+def cmd_modpow(args):
+    """Modular exponentiation: base^exp mod m."""
+    base, exp, mod = int(args[0]), int(args[1]), int(args[2])
+    result = pow(base, exp, mod)
+    print(f"{base}^{exp} mod {mod} = {result}")
+
+def cmd_fibonacci(args):
+    """Compute nth Fibonacci number (fast doubling)."""
+    n = int(args[0])
+    def fib(n):
+        if n <= 0: return 0
+        if n == 1: return 1
+        if n % 2 == 0:
+            k = n // 2
+            fk = fib(k)
+            fk1 = fib(k - 1)
+            return fk * (2 * fk1 + fk)
+        else:
+            k = (n + 1) // 2
+            fk = fib(k)
+            fk1 = fib(k - 1)
+            return fk * fk + fk1 * fk1
+    result = fib(n)
+    s = str(result)
+    if len(s) > 100:
+        print(f"F({n}) = {s[:50]}...{s[-50:]} ({len(s)} digits)")
+    else:
+        print(f"F({n}) = {result}")
+
+def cmd_digits(args):
+    """Analyze digit count and properties of a number."""
+    n = int(args[0])
+    s = str(abs(n))
+    print(f"Digits: {len(s)}")
+    print(f"Digit sum: {sum(int(d) for d in s)}")
+    print(f"Digital root: {(n - 1) % 9 + 1 if n else 0}")
+    print(f"Bits: {n.bit_length()}")
+    print(f"Hex digits: {len(hex(abs(n))) - 2}")
+
+CMDS = {
+    'calc': (cmd_calc, 'EXPR — arbitrary precision arithmetic'),
+    'factor': (cmd_factor, 'N — prime factorization'),
+    'prime': (cmd_prime, 'N — primality test (Miller-Rabin)'),
+    'genprime': (cmd_genprime, '[BITS] — generate random prime (default 256)'),
+    'gcd': (cmd_gcd, 'N M [...] — GCD and LCM'),
+    'modpow': (cmd_modpow, 'BASE EXP MOD — modular exponentiation'),
+    'fibonacci': (cmd_fibonacci, 'N — nth Fibonacci (fast doubling)'),
+    'digits': (cmd_digits, 'N — digit analysis'),
+}
 
 def main():
-    print("BigNum arithmetic demo\n")
-    a = BigNum.from_str("999999999999999999")
-    b = BigNum.from_str("1")
-    print(f"  {a} + {b} = {a + b}")
-    c = BigNum.from_str("123456789")
-    d = BigNum.from_str("987654321")
-    print(f"  {c} * {d} = {c * d}")
-    f50 = factorial(50)
-    print(f"  50! = {f50}")
-    f100 = factorial(100)
-    s = repr(f100)
-    print(f"  100! = {s[:30]}...({len(s)} digits)")
+    if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help'):
+        print("Usage: bignum <command> [args...]")
+        for n, (_, d) in sorted(CMDS.items()):
+            print(f"  {n:10s} {d}")
+        sys.exit(0)
+    cmd = sys.argv[1]
+    if cmd not in CMDS: print(f"Unknown: {cmd}", file=sys.stderr); sys.exit(1)
+    CMDS[cmd][0](sys.argv[2:])
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

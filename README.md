@@ -1,11 +1,7 @@
 # bignum
-
-bignum - Arbitrary precision arithmetic without Python's built-in bigint.
-
-Zero-dependency, single-file Python CLI.
-
+#!/usr/bin/env python3
 ## Usage
-
 ```bash
-python3 bignum.py
+python3 bignum.py --help
 ```
+Single-file Python, zero dependencies.
